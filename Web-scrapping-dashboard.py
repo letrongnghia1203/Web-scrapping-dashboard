@@ -70,13 +70,11 @@ if symbol and st.button("Phân tích"):
         
         # Áp dụng phân tích cảm xúc và tính điểm
         df_pandas_news[['article_score', 'article_sentiment']] = df_pandas_news.apply(vader_analyze, axis=1)
-        
-        # Thêm cột URL có thể nhấp
-        df_pandas_news['url_clickable'] = df_pandas_news['url'].apply(lambda x: f"[Link bài báo]({x})")
 
-        # Hiển thị bảng tin tức và kết quả
+        # Hiển thị bảng tin tức với các liên kết có thể nhấp
         st.write("### Tin Tức")
-        st.dataframe(df_pandas_news[['news_date', 'title', 'introduction', 'article_score', 'article_sentiment', 'url_clickable']])
+        for index, row in df_pandas_news.iterrows():
+            st.markdown(f"**Ngày**: {row['news_date']} | **Tiêu đề**: [{row['title']}]({row['url']}) | **Cảm xúc**: {row['article_sentiment']} | **Điểm**: {row['article_score']:.2f}")
 
         # Tính trung bình 10 bài báo gần nhất
         average_sentiment = df_pandas_news['article_score'].mean()
@@ -95,7 +93,7 @@ if symbol and st.button("Phân tích"):
                     {'range': [66, 100], 'color': '#4CAF50'}  # Positive
                 ],
                 'threshold': {
-                    'line': {'color': "black", 'width': 4},
+                    'line': {'color': "black"},
                     'thickness': 0.75,
                     'value': average_sentiment
                 }
