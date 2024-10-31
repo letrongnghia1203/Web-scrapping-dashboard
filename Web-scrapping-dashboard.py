@@ -4,11 +4,9 @@ from vaderSentiment.vaderSentiment import SentimentIntensityAnalyzer
 from googletrans import Translator
 import urllib3
 from bs4 import BeautifulSoup
-from pyspark.sql import SparkSession, Row
 import plotly.graph_objects as go
 
-# Khởi tạo Spark Session
-spark = SparkSession.builder.appName("News Scraper with Sentiment Analysis").getOrCreate()
+# Khởi tạo HTTP PoolManager và các công cụ phân tích cảm xúc
 http = urllib3.PoolManager()
 analyzer = SentimentIntensityAnalyzer()
 translator = Translator()
@@ -28,7 +26,7 @@ def get_latest_articles(symbol, limit=10):
     soup = BeautifulSoup(r.data, "html.parser")
     data = soup.find("ul", {"class": "News_Title_Link"})
     if not data:
-        return []
+        return pd.DataFrame()  # Trả về DataFrame rỗng nếu không có dữ liệu
 
     raw = data.find_all('li')
     for row in raw:
@@ -36,10 +34,10 @@ def get_latest_articles(symbol, limit=10):
         title = row.a.text.strip()
         article_url = "https://s.cafef.vn/" + str(row.a['href'])
         introduction = get_introduction(article_url)
-        data_rows.append(Row(news_date=news_date, title=title, url=article_url, symbol=symbol, introduction=introduction))
+        data_rows.append({"news_date": news_date, "title": title, "url": article_url, "symbol": symbol, "introduction": introduction})
         if len(data_rows) >= limit:
             break
-    return data_rows
+    return pd.DataFrame(data_rows)
 
 # Hàm phân tích cảm xúc với VADER
 def vader_analyze(row):
@@ -56,12 +54,9 @@ symbol = st.text_input("Nhập mã cổ phiếu:", "SAB")
 
 if st.button("Phân tích"):
     # Lấy dữ liệu tin tức
-    news_data = get_latest_articles(symbol, limit=10)
+    df_pandas_news = get_latest_articles(symbol, limit=10)
     
-    if news_data:
-        df_spark_news = spark.createDataFrame(news_data)
-        df_pandas_news = df_spark_news.toPandas()
-        
+    if not df_pandas_news.empty:
         # Dịch tiêu đề và phần giới thiệu sang tiếng Anh
         df_pandas_news['title_en'] = df_pandas_news['title'].apply(lambda x: translator.translate(x, src='vi', dest='en').text)
         df_pandas_news['introduction_en'] = df_pandas_news['introduction'].apply(lambda x: translator.translate(x, src='vi', dest='en').text)
