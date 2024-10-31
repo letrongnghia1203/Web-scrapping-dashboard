@@ -1,17 +1,16 @@
 import streamlit as st
 import pandas as pd
 from vaderSentiment.vaderSentiment import SentimentIntensityAnalyzer
-from googletrans import Translator
+from deep_translator import GoogleTranslator
 import urllib3
 from bs4 import BeautifulSoup
 import plotly.graph_objects as go
 
-# Khởi tạo HTTP PoolManager và các công cụ phân tích cảm xúc
+# Khởi tạo HTTP PoolManager và công cụ phân tích cảm xúc
 http = urllib3.PoolManager()
 analyzer = SentimentIntensityAnalyzer()
-translator = Translator()
 
-# Hàm lấy đoạn introduction
+# Hàm lấy đoạn introduction từ trang web
 def get_introduction(url):
     r = http.request('GET', url)
     soup = BeautifulSoup(r.data, "html.parser")
@@ -39,6 +38,14 @@ def get_latest_articles(symbol, limit=10):
             break
     return pd.DataFrame(data_rows)
 
+# Hàm dịch văn bản từ tiếng Việt sang tiếng Anh
+def translate_text(text):
+    try:
+        return GoogleTranslator(source='vi', target='en').translate(text)
+    except Exception as e:
+        print("Lỗi dịch văn bản:", e)
+        return text  # Trả về văn bản gốc nếu dịch thất bại
+
 # Hàm phân tích cảm xúc với VADER
 def vader_analyze(row):
     combined_text = f"{row['title_en']} {row['introduction_en']}".strip() if row['introduction_en'] != "No introduction" else row['title_en']
@@ -49,17 +56,17 @@ def vader_analyze(row):
 # Dashboard Streamlit
 st.title("Phân Tích Cảm Xúc Tin Tức Chứng Khoán")
 
-# Nhập mã cổ phiếu
+# Nhập mã cổ phiếu từ người dùng
 symbol = st.text_input("Nhập mã cổ phiếu:")
 
-if st.button("Phân tích"):
+if symbol and st.button("Phân tích"):
     # Lấy dữ liệu tin tức
     df_pandas_news = get_latest_articles(symbol, limit=10)
     
     if not df_pandas_news.empty:
         # Dịch tiêu đề và phần giới thiệu sang tiếng Anh
-        df_pandas_news['title_en'] = df_pandas_news['title'].apply(lambda x: translator.translate(x, src='vi', dest='en').text)
-        df_pandas_news['introduction_en'] = df_pandas_news['introduction'].apply(lambda x: translator.translate(x, src='vi', dest='en').text)
+        df_pandas_news['title_en'] = df_pandas_news['title'].apply(translate_text)
+        df_pandas_news['introduction_en'] = df_pandas_news['introduction'].apply(translate_text)
         
         # Áp dụng phân tích cảm xúc và tính điểm
         df_pandas_news[['article_score', 'article_sentiment']] = df_pandas_news.apply(vader_analyze, axis=1)
