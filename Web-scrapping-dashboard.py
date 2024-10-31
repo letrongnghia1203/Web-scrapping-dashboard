@@ -50,7 +50,7 @@ def vader_analyze(row):
 st.title("Phân Tích Cảm Xúc Tin Tức Chứng Khoán")
 
 # Nhập mã cổ phiếu
-symbol = st.text_input("Nhập mã cổ phiếu:", "SAB")
+symbol = st.text_input("Nhập mã cổ phiếu:")
 
 if st.button("Phân tích"):
     # Lấy dữ liệu tin tức
