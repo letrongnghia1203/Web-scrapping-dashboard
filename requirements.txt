@@ -1,0 +1,7 @@
+streamlit
+vaderSentiment
+googletrans==4.0.0-rc1
+pyspark
+plotly
+urllib3
+beautifulsoup4
