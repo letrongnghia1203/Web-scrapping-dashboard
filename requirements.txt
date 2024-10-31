@@ -1,7 +1,7 @@
 streamlit
 vaderSentiment
-googletrans==4.0.0-rc1
-pyspark
+deep-translator
 plotly
 urllib3
 beautifulsoup4
+pandas
