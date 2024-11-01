@@ -72,9 +72,9 @@ st.title("Phân Tích Cảm Xúc Tin Tức Chứng Khoán")
 # User input for stock symbol
 symbol = st.text_input("Nhập mã cổ phiếu:")
 
-if symbol and st.button("Phân tích"):
+if symbol:
     # Fetch news data
-    df_pandas_news = get_latest_articles(symbol, limit=10)
+    df_pandas_news = get_latest_articles(symbol, limit=20)
     
     if not df_pandas_news.empty:
         # Translate title and introduction to English
