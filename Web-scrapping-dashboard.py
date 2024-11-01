@@ -2,7 +2,7 @@ import streamlit as st
 import pandas as pd
 from vaderSentiment.vaderSentiment import SentimentIntensityAnalyzer
 from deep_translator import GoogleTranslator
-import urllib3
+import requests
 from bs4 import BeautifulSoup
 import plotly.graph_objects as go
 import matplotlib.pyplot as plt
@@ -10,36 +10,45 @@ from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.cluster import KMeans
 from wordcloud import WordCloud
 
-# Initialize HTTP PoolManager and sentiment analyzer
-http = urllib3.PoolManager()
+# Initialize sentiment analyzer
 analyzer = SentimentIntensityAnalyzer()
 
 # Function to fetch introduction from a website
 def get_introduction(url):
-    r = http.request('GET', url)
-    soup = BeautifulSoup(r.data, "html.parser")
-    introduction = soup.find("h2", {"class": "intro"})
-    return introduction.text.strip() if introduction else "No introduction"
+    try:
+        headers = {'User-Agent': 'Mozilla/5.0'}
+        r = requests.get(url, headers=headers)
+        soup = BeautifulSoup(r.content, "html.parser")
+        introduction = soup.find("h2", {"class": "intro"})
+        return introduction.text.strip() if introduction else "No introduction"
+    except Exception as e:
+        st.write(f"Error fetching introduction: {e}")
+        return "No introduction"
 
 # Function to fetch latest articles
 def get_latest_articles(symbol, limit=10):
     data_rows = []
-    url = f'https://s.cafef.vn/Ajax/Events_RelatedNews_New.aspx?symbol={symbol}&floorID=0&configID=0&PageIndex=1&PageSize={limit}&Type=2'
-    r = http.request('GET', url)
-    soup = BeautifulSoup(r.data, "html.parser")
-    data = soup.find("ul", {"class": "News_Title_Link"})
-    if not data:
-        return pd.DataFrame()  # Return empty DataFrame if no data
-
-    raw = data.find_all('li')
-    for row in raw:
-        news_date = row.span.text.strip()
-        title = row.a.text.strip()
-        article_url = "https://s.cafef.vn/" + str(row.a['href'])
-        introduction = get_introduction(article_url)
-        data_rows.append({"news_date": news_date, "title": title, "url": article_url, "symbol": symbol, "introduction": introduction})
-        if len(data_rows) >= limit:
-            break
+    try:
+        url = f'https://s.cafef.vn/Ajax/Events_RelatedNews_New.aspx?symbol={symbol}&floorID=0&configID=0&PageIndex=1&PageSize={limit}&Type=2'
+        headers = {'User-Agent': 'Mozilla/5.0'}
+        r = requests.get(url, headers=headers)
+        soup = BeautifulSoup(r.content, "html.parser")
+        data = soup.find("ul", {"class": "News_Title_Link"})
+        if not data:
+            st.write("No news data available.")
+            return pd.DataFrame()
+        
+        raw = data.find_all('li')
+        for row in raw:
+            news_date = row.span.text.strip()
+            title = row.a.text.strip()
+            article_url = "https://s.cafef.vn/" + str(row.a['href'])
+            introduction = get_introduction(article_url)
+            data_rows.append({"news_date": news_date, "title": title, "url": article_url, "symbol": symbol, "introduction": introduction})
+            if len(data_rows) >= limit:
+                break
+    except Exception as e:
+        st.write(f"Error fetching articles: {e}")
     return pd.DataFrame(data_rows)
 
 # Function to translate text from Vietnamese to English
@@ -47,8 +56,8 @@ def translate_text(text):
     try:
         return GoogleTranslator(source='vi', target='en').translate(text)
     except Exception as e:
-        print("Translation error:", e)
-        return text
+        st.write(f"Translation error: {e}")
+        return text  # Fallback to original text if translation fails
 
 # VADER sentiment analysis function
 def vader_analyze(row):
@@ -75,10 +84,13 @@ if symbol and st.button("Phân tích"):
         # Apply sentiment analysis and calculate score
         df_pandas_news[['article_score', 'article_sentiment']] = df_pandas_news.apply(vader_analyze, axis=1)
 
+        # Convert 'news_date' to datetime with dayfirst=True
+        df_pandas_news['news_date'] = pd.to_datetime(df_pandas_news['news_date'], dayfirst=True)
+
         # Display news table with clickable links
         st.write("### Tin Tức")
         for index, row in df_pandas_news.iterrows():
-            st.markdown(f"**Ngày**: {row['news_date']} | **Tiêu đề**: [{row['title']}]({row['url']}) | **Cảm xúc**: {row['article_sentiment']} | **Điểm**: {row['article_score']:.2f}")
+            st.markdown(f"**Ngày**: {row['news_date'].strftime('%d/%m/%Y')} | **Tiêu đề**: [{row['title']}]({row['url']}) | **Cảm xúc**: {row['article_sentiment']} | **Điểm**: {row['article_score']:.2f}")
 
         # Average sentiment score of the 10 latest articles
         average_sentiment = df_pandas_news['article_score'].mean()
@@ -107,7 +119,6 @@ if symbol and st.button("Phân tích"):
 
         # Line chart of article scores over time
         st.write("### Điểm Cảm Xúc Theo Thời Gian")
-        df_pandas_news['news_date'] = pd.to_datetime(df_pandas_news['news_date'])
         df_pandas_news = df_pandas_news.sort_values(by='news_date')
         st.line_chart(df_pandas_news.set_index('news_date')['article_score'])
 
@@ -117,8 +128,8 @@ if symbol and st.button("Phân tích"):
         st.bar_chart(sentiment_counts)
 
         # Text preprocessing for word cloud
-        df_pandas_news['cleaned_title_en'] = df_pandas_news['title_en'].str.replace(r'\W', ' ')
-        df_pandas_news['cleaned_introduction_en'] = df_pandas_news['introduction_en'].str.replace(r'\W', ' ')
+        df_pandas_news['cleaned_title_en'] = df_pandas_news['title_en'].str.replace(r'\W', ' ', regex=True)
+        df_pandas_news['cleaned_introduction_en'] = df_pandas_news['introduction_en'].str.replace(r'\W', ' ', regex=True)
         
         text_data = df_pandas_news['cleaned_title_en'] + " " + df_pandas_news['cleaned_introduction_en']
         
