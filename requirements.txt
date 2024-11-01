@@ -1,7 +1,10 @@
 streamlit
+pandas
 vaderSentiment
 deep-translator
-plotly
 urllib3
 beautifulsoup4
-pandas
+plotly
+scikit-learn
+matplotlib
+wordcloud
